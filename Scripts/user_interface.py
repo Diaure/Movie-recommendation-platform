@@ -85,6 +85,8 @@ def load_updated_data():
         return None, None
 
 df_now_playing, df_future = load_updated_data()
+st.write(df_now_playing.head())
+st.write(df_future.head())
 
 #***********************************************************************************
 # RECUPERATION DES AFFICHES SUR TMDB
