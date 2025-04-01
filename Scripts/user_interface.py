@@ -5,8 +5,7 @@ import os
 import subprocess
 import ast
 from streamlit_modal import Modal
-import schedule
-import time
+from PIL import Image
 
 
 #***********************************************************************************
@@ -86,6 +85,8 @@ def load_updated_data():
         return None, None
 
 df_now_playing, df_future = load_updated_data()
+st.write(df_now_playing.head())
+st.write(df_future.head())
 
 #***********************************************************************************
 # RECUPERATION DES AFFICHES SUR TMDB
@@ -110,7 +111,7 @@ def user_movie_choice(df_movies):
     # création d'une colonne en minuscule pour faciliter les recherches
     df_movies['originalTitle_lower'] = df_movies['originalTitle'].str.lower()
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2= st.columns(2)
 
     with col1:
         # champ de saisie de l'utilisateur
@@ -126,7 +127,7 @@ def user_movie_choice(df_movies):
 
         with col2:
             # Selectbox pour afficher les suggestions
-            selected_movie = st.selectbox("Choisissez le film correspondant à votre recherche :", movie_list)
+            selected_movie = st.selectbox("Sélectionnez le film correspondant à votre recherche :", movie_list)
             if selected_movie:
     
                 # définir la table pour récupérer les informations du film
@@ -151,17 +152,11 @@ def user_movie_choice(df_movies):
                     else:
                         actors = actors_data
                     
-
                     ordering_data = movie_info['actors_rank'].iloc[0]
                     if isinstance(ordering_data, str):
                         ordering = list(map(int, ast.literal_eval(ordering_data)))
                     else:
                         ordering = list(map(int, ordering_data))
-                    
-                    
-                    # movie_info['actors_rank'] = movie_info['actors_rank'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
-                    # movie_info['actors_rank'] = movie_info['actors_rank'].apply(lambda x: list(map(int, x)) if isinstance(x, list) else x)
-                    # ordering = ', '.join(map, str, movie_info['actors_rank'].iloc[0])  # Liste des rangs
 
                     # extraire les acteurs principaux et secondaires
                     actors_with_rank = list(zip(actors, ordering))
@@ -204,46 +199,60 @@ def user_movie_choice(df_movies):
                     # extraire et sélectionner la durée
                     time = int(movie_info['runtimeMinutes'].iloc[0])
 
+                    poster_url = get_image(selected_movie)
+                        #modal = Modal("Détails du film", key="film_modal", max_width=800) 
 
-                    with col3:
-                        modal = Modal("Détails du film", key="film_modal", max_width=800)
-                        if st.button("Voir les détails du film"):
-                            st.markdown("""
-                                <div style="
-                                font-weight: bold;
-                                border: 2px solid #04AA6D;
-                                box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
-                                padding: 10px 20px;
-                                text-align: center;
-                                cursor: pointer;
-                                background-color: #f0f8ff;
-                                </div>
-                                """, unsafe_allow_html=True)
-                            modal.open()
+                        # if st.button("Voir les détails du film"):
+                            #modal.open()                  
 
-                        poster_url = get_image(selected_movie)
-
-                        if modal.is_open():
-                            with modal.container():
-                                st.markdown(# afficher le poster et les informations du film
-                                f"""
-                                <div style="display: flex; align-items: space-between;">
-                                <!-- Image du film -->
-                                <img src="{poster_url}" style="margin-right: 10px; width:380px; height:420px;">
-                                                <div style="max-width: 800px;">
-                                                    <p style="margin: 0;"><strong> Synopsis :</strong> <em> {overview} </em></p>
-                                                    <p style="margin: 0;"><strong> Réalisation par :</strong> {realisateur_str}</p>
-                                                    <p style="margin: 0;"><strong> Genres :</strong> {genres_str}</p>
-                                                    <p style="margin: 0;"><strong> Distribution :</strong> {actors_str}</p>                                       
-                                                    <p style="margin: 0;"><strong> Ecrit par :</strong> {scenariste_str}</p>
-                                                    <p style="margin: 0;"><strong>{year} ({time} minutes)</strong></p>
-                                                    <p style="margin: 0;"><font size="16">{note}</font></p>
-                                                </div>
-                                </div>
-                                """, 
-                                        unsafe_allow_html=True)
-                if movie_info.empty:
-                    st.warning("Aucune information trouvée pour ce film.") 
+                        # if modal.is_open():
+                            # with modal.container():
+                                # st.markdown(
+                                #     """
+                                #     <style>
+                                #     .modal-container {
+                                #         position: fixed !important;
+                                #         top: 50% !important;
+                                #         left: 50% !important;
+                                #         transform: translate(-50%, -50%) !important;
+                                #         z-index: 9999 !important;
+                                #         background-color: white !important;
+                                #         padding: 20px !important;
+                                #         border-radius: 10px !important;
+                                #         box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.2) !important;
+                                #         width: 60% !important;
+                                #     }
+                                #     </style>
+                                #     """,
+                                #     unsafe_allow_html=True,
+                                # )
+                                # modal_placeholder = st.empty()  # Créer un espace réservé
+                                # with modal_placeholder.container():
+        st.markdown(f""" 
+        <div style="display: flex; align-items: space-between;">
+                <!-- Image du film -->
+                <img src="{poster_url}" style="margin-right: 10px; width:820px; height:400px;">
+                <div style="max-width: 1000px;">
+                    <p style="margin: 0;"><strong> Synopsis :</strong> <em> {overview} </em></p>
+                    <p style="margin: 0;"><strong> Année de sortie : {year}</strong></p>
+                    <p style="margin: 0;"><strong> Durée : {time} minutes</strong></p>
+                    <p style="margin: 0;"><strong> Réalisation :</strong> {realisateur_str}</p>
+                    <p style="margin: 0;"><strong> Genres :</strong> {genres_str}</p>
+                    <p style="margin: 0;"><strong> Distribution :</strong> {actors_str}</p> 
+                    <p style="margin: 0;"><strong> Scénario :</strong> {scenariste_str}</p> 
+                    <p style="margin: 0;"><strong> Production :</strong> {producteur_str}</p>   
+                    <p style="margin: 0;"><strong> Cinématographie :</strong> {cineaste_str}</p> 
+                    <p style="margin: 0;"><strong> Montage :</strong> {editeur_str}</p>                                    
+                    <p style="margin: 0;"> <strong> <font size="12">{movie_info['averageRating'].iloc[0]}/10</strong></p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+                                # if st.button("Fermer"):
+                                #     modal.close()
+                 
+        if movie_info.empty:
+            st.warning("Aucune information trouvée pour ce film.") 
 
 #***********************************************************************************
 # BARRE DE NAVIGATION
@@ -262,7 +271,7 @@ st.markdown("""
 .nav-link {
     padding: 10px 30px; /* Ajuster le padding pour une meilleure apparence */
     background-color:white;
-    color: rgb(148, 73, 189) !important;
+    color: rgb(67.8, 84.7, 90.2) !important;
     border-radius: 16px;
     border: none;
     cursor: pointer;
@@ -293,18 +302,55 @@ st.markdown("""
 
 #***********************************************************************************
 # Barre de navigation (dans un seul conteneur)
-logo_path = "static/Capture_2.PNG"
-st.markdown("""
-<div class="nav-bar">
-    <div class="logo-h1">
-        <img src="static/Capture_2.PNG" alt="Votre Logo" style="height: 100px; margin-right: 30px;">
-    </div>
-    <div class="nav-buttons">  <a href="?page=accueil" class="nav-link">Accueil</a>
-        <a href="?page=recommandation" class="nav-link">Application</a>
+logo_path = "static/cine.png"
+# st.markdown("""
+# <div class="nav-bar">
+#     <div class="logo-h1">
+#         <img src="static/Capture.PNG" alt="Votre Logo" style="height: 100px; margin-right: 30px;">
+#     </div>
+#     <div class="nav-buttons">  <a href="?page=accueil" class="nav-link">Accueil</a>
+#         <a href="?page=recommandation" class="nav-link">Application</a>
+#             <a href="?page=analyse" class="nav-link">Indicateurs clés films</a>
+#     </div>
+# </div>
+# """, unsafe_allow_html=True)
+
+col3, col4 = st.columns([1, 3])
+
+with col3:
+    try:
+        logo = Image.open(logo_path)
+        st.image(logo, width=100)
+    except FileNotFoundError:
+        st.error("Logo non trouvé. Vérifiez le chemin d'accès.")
+
+with col4:
+    st.markdown("""
+    <style>
+    .nav-bar {
+        display: flex;
+        align-items: center;
+    }
+    .nav-buttons {
+        display: flex;
+        justify-content: space-around;
+        width: 100%;
+    }
+    .nav-link {
+        text-decoration: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        background-color: #f0f0f0;
+        color: #333;
+    }
+    </style>
+    <div class="nav-bar">
+        <div class="nav-buttons"> <a href="?page=accueil" class="nav-link">Accueil</a>
+            <a href="?page=recommandation" class="nav-link">Application</a>
             <a href="?page=analyse" class="nav-link">Indicateurs clés films</a>
+        </div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 #***********************************************************************************
 # Gestion des paramètres et affichage des pages
@@ -312,33 +358,36 @@ params = st.query_params
 current_page = params.get("page", "accueil")
 
 if current_page == "accueil":
-    st.title("Bienvenue sur What Movie 2D?")
-    #image = Image.open("Capture.JPG")
-    #st.image(image, caption="Image de présentation", use_column_width=True)
-    st.markdown("""
-    <img src="static/Capture.JPG" style="float: left" alt="Image" style="width:100%;"/>
-    <div style='font-size:18px;'>
-    <br>Vous hésitez sur quel film regarder ce soir ?
-    <br> <b>What Movie 2D?</b>  est une plateforme conçue pour vous aider à découvrir des films
-    qui correspondent à vos goûts grâce à une recommandation personnalisée basée sur les données.<br>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Bienvenue sur CineWhat?")
+    col5, col6 = st.columns([1, 2])
+    with col5:
+        st.image(logo_path, use_container_width=True)
+    
+    with col6:
+        st.markdown("""
+        <div style='font-size:18px;'>
+        <br> <b> Vous hésitez sur quel film regarder ce soir ? </b>
+        <br> <b>CineWhat?</b>  est une plateforme conçue pour vous aider à découvrir des films
+        qui correspondent à vos goûts grâce à une recommandation personnalisée basée sur les données.<br>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style='font-size:18px;'>
-    <br> <b> Pourquoi cette plateforme ?</b>
-    <br>Ce projet a été conçu dans le cadre de mon parcours en Data Analysis afin de mettre en pratique mes compétences en collecte, <br>
-    traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.<br>
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:18px;'>
+        <br> <b> Pourquoi cette plateforme ?</b>
+        <br>Ce projet a été conçu dans le cadre de mon parcours en Data Analysis afin de mettre en pratique mes compétences en collecte,
+        traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.<br>
+        </div>
+        """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style='font-size:18px;'>
-    <br> <b> Que trouverez-vous ici ?</b>
-    <br>* <b>Application de recommandation</b> : Entrez vos préférences et laissez l'algorithme vous suggérer des films adaptés<br>
-    traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.
-    </div>
-    """, unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:18px;'>
+        <br> <b> Que trouverez-vous ici ?</b>
+        <br>* <b>Application de recommandation</b> : Entrez vos préférences et laissez l'algorithme vous suggérer des films adaptés
+        traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.
+        </div>
+        """, unsafe_allow_html=True)
+
     st.markdown("""
     <div style='font-size:18px;'>
     <br> * <b>Indicateurs d'analyse </b> : Visualisez des statistiques sur les films collectés, explorez les tendances du cinéma et comprenez les mécanismes derrière les recommandations.
@@ -346,8 +395,8 @@ if current_page == "accueil":
     """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
+    col7, col8 = st.columns(2)
+    with col7:
         st.markdown("""
                 <div style="
                 font-weight: bold;
@@ -362,7 +411,7 @@ if current_page == "accueil":
         </div>
         """, unsafe_allow_html=True)
         
-    with col2:
+    with col8:
         st.markdown("""
                 <div style="
                 font-weight: bold;
@@ -379,9 +428,8 @@ if current_page == "accueil":
 
 elif current_page == "recommandation":
     st.title("Bienvenue sur l'application de recommandation de films")
-
-    st.markdown("""
-    <img src="static/Capture.JPG" style="float: left" alt="Image" style="width:100%;"/> </div>""", unsafe_allow_html=True)
+    # st.markdown("""
+    # <img src="static/Capture.JPG" style="float: left" alt="Image" style="width:100%;"/> </div>""", unsafe_allow_html=True)
     
     df_movies = load_static_data()
     user_movie_choice(df_movies)
