@@ -354,10 +354,6 @@ def recommander_depuis_autre_df(film_titre, df_source, df_target, knn, scaler, t
         match = df_source[df_source['originalTitle'] == film_titre]
         if match.empty:
             return f"Film '{film_titre}' non trouvé dans df_source"
-        
-        print("Film sélectionné :", film_titre)
-        print("Exemples dans df_source :", df_source['originalTitle'].head(10).tolist())
-        print("Match exact :", df_source[df_source['originalTitle'] == film_titre])
 
         index = match.index[0]
 
@@ -366,12 +362,6 @@ def recommander_depuis_autre_df(film_titre, df_source, df_target, knn, scaler, t
         X_features = align_features(X_features, features)
         X_scaled = pd.DataFrame(scaler.transform(X_features), columns=features)
         # X_num = scaler.transform(df_source.loc[[index], features].reindex(columns=features))
-
-        missing_features_source = [feat for feat in features if feat not in df_source.columns]
-        missing_features_target = [feat for feat in features if feat not in df_target.columns]
-
-        print("Features manquants dans df_source :", missing_features_source)
-        print("Features manquants dans df_target :", missing_features_target)
 
         # Texte (overview)
         overview = df_source.loc[index, 'overview']
@@ -385,6 +375,9 @@ def recommander_depuis_autre_df(film_titre, df_source, df_target, knn, scaler, t
         X_target_num = scaler.transform(df_target_aligned)
         X_target_text = tfidf_vectorizer.transform(df_target["overview"].fillna(""))
         X_target_full = hstack([X_target_num, X_target_text])
+
+        missing_features_source = [feat for feat in features if feat not in df_source.columns]
+        missing_features_target = [feat for feat in features if feat not in df_target.columns]
 
         # Prédiction avec le knn entraîné sur df_target
         knn.fit(X_target_full)
@@ -403,36 +396,6 @@ def recommander_depuis_autre_df(film_titre, df_source, df_target, knn, scaler, t
 # définir les features utilisées
 # features = ['runtimeMinutes', 'averageRating', 'numVotes', 'popularity', 'budget']
 # features += [col for col in df_movies.columns if col.startswith("genre_")]
-
-# TESTS
-film_test = "Titanic"  # par exemple, ou n’importe quel film que tu sais présent dans df_movies
-
-reco_now = recommander_depuis_autre_df(
-    film_titre=film_test,
-    df_source=df_movies,
-    df_target=df_now_playing,
-    knn=knn,
-    scaler=scaler,
-    tfidf_vectorizer=tfidf_vectorizer,
-    features=features,
-    n_recommendations=10
-)
-st.write(reco_now)
-
-reco_up = recommander_depuis_autre_df(
-    film_titre=film_test,
-    df_source=df_movies,
-    df_target=df_upcoming,
-    knn=knn,
-    scaler=scaler,
-    tfidf_vectorizer=tfidf_vectorizer,
-    features=features,
-    n_recommendations=10
-)
-st.write(reco_up)
-
-st.write(df_now_playing[df_now_playing["originalTitle"].str.contains("White", case=False, na=False)])
-
 
 # fonction pour la recommandation par acteur
 def recommander_par_acteur(acteur, df, n=10):
@@ -517,7 +480,7 @@ def recommendation_show():
         cols_now = st.columns(len(movie_upcoming))
         for i, col in enumerate(cols_now):
             with col:
-                st.image(get_image(movie_upcoming["originalTitle"].iloc[i], df_upcoming), use_column_width=True)
+                st.image(get_image(movie_upcoming["originalTitle"].iloc[i], df_upcoming), use_container_width=True)
                 st.caption(movie_upcoming["originalTitle"].iloc[i])
 
 
