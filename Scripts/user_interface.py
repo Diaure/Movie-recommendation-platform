@@ -21,7 +21,7 @@ st.markdown(
     """
     <style>
     .stApp {
-        background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+        background-image: linear-gradient(rgba(0.5, 0.5, 0.5, 0.5), rgba(0.5, 0.5, 0.5, 0.5)),
                         url("https://images.unsplash.com/photo-1542204165-65bf26472b9b?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8ZmlsbXxlbnwwfHwwfHx8MA%3D%3D");
         background-size: cover;
         background-position: center;
@@ -29,7 +29,7 @@ st.markdown(
         background-repeat: no-repeat;
     }
     .block-container {
-        background-color: rgba(255, 255, 255, 0.85);
+        background-color: rgba(255, 255, 255, 0.65);
         padding: 2rem;
         border-radius: 10px;
     }
@@ -170,11 +170,15 @@ if is_admin:
 def get_image(selected_movie, df_source):
     racine = 'https://image.tmdb.org/t/p/w600_and_h900_bestv2'
     try:
-        poster_url = racine + df_source[df_source['originalTitle'] == selected_movie]['poster_path'].iloc[0]
-        return poster_url
-    except IndexError:
-        print(f"Image non trouvée pour le film {selected_movie}")
-        return "logo.PNG"
+        poster_path = df_source[df_source['originalTitle'] == selected_movie]['poster_path'].iloc[0]
+        if pd.isna(poster_path) or poster_path == '':
+            raise ValueError("Aucune image disponible")
+
+        return racine + poster_path
+        
+    except (IndexError, ValueError) as e:
+        print(f"Image non trouvée pour le film '{selected_movie}' : {e}")
+        return "https://via.placeholder.com/300x450?text=No+Image"
 
 #***********************************************************************************
 # FONCTION D'AFFICHAGE DES DETAILS DU FILM SELECTIONNE PAR L'UTILISATEUR
@@ -267,8 +271,21 @@ def movie_details(df, selected_movie):
         note = movie_info['averageRating'].iloc[0]  
 
         # extraire et sélectionner l'année
-        movie_info['startYear'] = (pd.to_datetime(movie_info['startYear'])).dt.year
-        year = movie_info['startYear'].iloc[0]
+        try:
+            start_year_raw = movie_info['startYear'].iloc[0]
+            
+            # Gérer les types chaîne comme "\N", NaN, etc.
+            if isinstance(start_year_raw, str):
+                if start_year_raw.strip().lower() in ["\\n", "nan", ""]:
+                    year = "Année inconnue"
+                else:
+                    year = int(start_year_raw)
+            elif pd.isna(start_year_raw):
+                year = "Année inconnue"
+            else:
+                year = int(start_year_raw)
+        except:
+            year = "Année inconnue"
 
         # extraire et sélectionner la durée
         time = int(movie_info['runtimeMinutes'].iloc[0])
@@ -277,7 +294,7 @@ def movie_details(df, selected_movie):
         st.markdown(f""" 
         <div style="display: flex; align-items: space-between;">
                 <!-- Image du film -->
-                <img src="{poster_url}" style="margin-right: 10px; width:520px; height:400px;">
+                <img src="{poster_url}" style="margin-right: 10px; width:620px; height:400px;">
                 <div style="max-width: 1000px;">
                     <p style="margin: 0;"><strong> Synopsis :</strong> <em> {overview} </em></p>
                     <p style="margin: 0;"><strong> Année de sortie : {year}</strong></p>
@@ -310,9 +327,8 @@ def align_features(df_input, features_reference):
             df_input[col] = 0
     return df_input[features_reference]
 
-
 # fonction de recommandation
-def recommander_films(film_titre, df, knn, scaler, tfidf_vectorizer, n_recommendations=5):
+def recommander_films(film_titre, df, knn, scaler, tfidf_vectorizer, n_recommendations=10):
 
     # vérifier si le film est bien dans la base
     if film_titre not in df['originalTitle'].values:
@@ -393,10 +409,6 @@ def recommander_depuis_autre_df(film_titre, df_source, df_target, knn, scaler, t
     except Exception as e:
         return f"Erreur lors de la recommandation : {e}"
 
-# définir les features utilisées
-# features = ['runtimeMinutes', 'averageRating', 'numVotes', 'popularity', 'budget']
-# features += [col for col in df_movies.columns if col.startswith("genre_")]
-
 # fonction pour la recommandation par acteur
 def recommander_par_acteur(acteur, df, n=10):
     films = []
@@ -415,6 +427,33 @@ def recommander_par_acteur(acteur, df, n=10):
     # On récupère les lignes (sans le rang)
     return pd.DataFrame([film[0] for film in sorted_films[:n]])
 
+# affichage des détails de recommandation avec modal
+def afficher_recommandations(titres, df_image, df_details, prefix):
+    modals = []
+
+    cols = st.columns(len(titres))
+    for i, col in enumerate(cols):
+        with col:
+            title = titres.iloc[i]
+            st.image(get_image(title, df_image), use_container_width=True)
+
+            bouton_key = f"{prefix}_btn_{i}"
+            modal_key = f"{prefix}_modal_{i}"
+            fermer_key = f"{prefix}_close_{i}"
+
+            if st.button(title, key=bouton_key):
+                st.session_state[modal_key] = True
+
+            if st.session_state.get(modal_key, False):
+                modals.append((title, df_details, modal_key, fermer_key))
+
+    for title, df, modal_key, fermer_key in modals:
+        modal = Modal(title, key=modal_key, max_width=1000)
+        with modal.container():
+            movie_details(df, title)
+            if st.button("Fermer", key=fermer_key):
+                st.session_state[modal_key] = False
+
 # fonction d'affichage des recommandations
 def recommendation_show():
     selected_movie = st.session_state.get("selected_movie", None)
@@ -425,57 +464,91 @@ def recommendation_show():
 
     # films dans le même genre
     st.subheader(" 🎬 Films dans le même genre")
-    movie_reco = recommander_films(film_titre=selected_movie, df=df_movies, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, n_recommendations=5)
+    movie_reco = recommander_films(film_titre=selected_movie, df=df_movies, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, n_recommendations=10)
 
     if isinstance(movie_reco, str):
         st.error(movie_reco)
         return
+    afficher_recommandations(movie_reco["originalTitle"], df_movies, df_movies, "genre")
 
-    cols = st.columns(len(movie_reco))
-    for i, col in enumerate(cols):
-        with col:
-            st.image(get_image(movie_reco["originalTitle"].iloc[i], df_movies), use_container_width=True)
-            st.caption(movie_reco["originalTitle"].iloc[i])
+    # cols = st.columns(len(movie_reco))
+    # for i, col in enumerate(cols):
+    #     with col:
+    #         title = movie_reco["originalTitle"].iloc[i]
+    #         st.image(get_image(title, df_movies), use_container_width=True)
+
+    #         st.markdown(f"""
+    #             <style>
+    #                 div[data-testid="stButton"][key="genre_modal_btn_{i}"] button {{
+    #                     background-color: white;
+    #                     color: black;
+    #                     border-radius: 8px;
+    #                     padding: 0.5em 1em;
+    #                     font-weight: bold;
+    #                     box-shadow: 20 8px 16px 0 rgba(0,0,0,0.2);
+    #                 }}
+    #                 div[data-testid="stButton"][key="genre_modal_btn_{i}"] button:hover {{
+    #                     background-color: #e7e7e7;
+    #                 }}
+    #             </style>
+    #         """, unsafe_allow_html=True)
+    #         if st.button(f"{title}", key=f"genre_modal_btn_{i}"):
+    #             st.session_state[f"open_modal_{i}"] = True
+    #         #st.caption(title)
+
+    #     if st.session_state.get(f"open_modal_{i}", False):
+    #         modal = Modal(title, key=f"modal_genre_{i}", max_width=1000)
+    #         with modal.container():
+    #             movie_details(df_movies, title)
+    #             if st.button("Fermer", key=f"close_genre_modal_{i}"):
+    #                 st.session_state[f"open_modal_{i}"] = False
 
     # films avec l'acteur principal
     act_princip = st.session_state.get("main_actor", None)
     if act_princip:
         st.subheader(f"Films avec {act_princip}")
         movie_main_actor = recommander_par_acteur(act_princip, df_movies)
+        afficher_recommandations(movie_main_actor["originalTitle"], movie_main_actor, movie_main_actor, "acteur")
 
-        cols_actor = st.columns(len(movie_main_actor))
-        for i, col in enumerate(cols_actor):
-            with col:
-                st.image(get_image(movie_main_actor["originalTitle"].iloc[i], df_movies), use_container_width=True)
-                st.caption(movie_main_actor["originalTitle"].iloc[i])
+        # cols_actor = st.columns(len(movie_main_actor))
+        # for i, col in enumerate(cols_actor):
+        #     with col:
+        #         actor_title = movie_main_actor["originalTitle"].iloc[i]
+        #         st.image(get_image(actor_title, df_movies), use_container_width=True)
+        #         #st.caption(actor_title)
+
+        # if st.session_state.get(f"open_modal_{i}", False):
+        #     modal = Modal(title, key=f"modal_genre_{i}", max_width=1000)
+        #     with modal.container():
+        #         movie_details(movie_main_actor, actor_title)
+        #         if st.button("Fermer", key=f"close_genre_modal_{i}"):
+        #             st.session_state[f"open_modal_{i}"] = False
     else:
         st.info("Acteur principal non disponible.")
 
     # films actuellement au cinéma
     st.subheader("Films actuellement au cinéma")
-    movie_now_playing = recommander_depuis_autre_df(film_titre=selected_movie, df_source=df_movies, df_target=df_now_playing, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, features=features, n_recommendations=5)
-    print(len(movie_now_playing))
-
+    movie_now_playing = recommander_depuis_autre_df(film_titre=selected_movie, df_source=df_movies, df_target=df_now_playing, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, features=features, n_recommendations=10)
 
     if isinstance(movie_now_playing, pd.DataFrame) and not movie_now_playing.empty:
-        num_movies = movie_now_playing.shape[0]
-        print(type(movie_now_playing))
-        print(movie_now_playing)
-        print(movie_now_playing.shape)
-        cols_now = st.columns(num_movies)
-        for i, col in enumerate(cols_now):
-            with col:
-                st.image(get_image(movie_now_playing["originalTitle"].iloc[i], df_now_playing), use_container_width=True)
-                st.caption(movie_now_playing["originalTitle"].iloc[i])
+        # num_movies = movie_now_playing.shape[0]
+        afficher_recommandations(movie_now_playing["originalTitle"], df_now_playing, df_now_playing, "now")
+     
+        # cols_now = st.columns(num_movies)
+        # for i, col in enumerate(cols_now):
+        #     with col:
+        #         st.image(get_image(movie_now_playing["originalTitle"].iloc[i], df_now_playing), use_container_width=True)
+        #         st.caption(movie_now_playing["originalTitle"].iloc[i])
     else:
         st.info("Aucun film à recommander pour les séances en cours.")
 
     # films bientôt au cinéma
     st.subheader("Films prochainement au cinéma")
-    movie_upcoming = recommander_depuis_autre_df(film_titre=selected_movie, df_source=df_movies, df_target=df_upcoming, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, features=features, n_recommendations=5)
+    movie_upcoming = recommander_depuis_autre_df(film_titre=selected_movie, df_source=df_movies, df_target=df_upcoming, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, features=features, n_recommendations=10)
     
-    if isinstance(movie_upcoming, str):
-        st.error(movie_upcoming)
+    if isinstance(movie_upcoming, pd.DataFrame) and not movie_upcoming.empty:
+        afficher_recommandations(movie_upcoming["originalTitle"], df_upcoming, df_upcoming, "upcoming")
+        # st.error(movie_upcoming)
     else:
         cols_now = st.columns(len(movie_upcoming))
         for i, col in enumerate(cols_now):
