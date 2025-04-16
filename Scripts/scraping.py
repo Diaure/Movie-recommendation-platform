@@ -68,6 +68,7 @@ def get_movie_details(movie_id):
 def fetch_movies_with_credits():
     movies = get_now_playing_movies()
     movie_data = []
+    today = datetime.today().date()
 
     for movie in movies:
         movie_id = movie["id"]
@@ -75,6 +76,15 @@ def fetch_movies_with_credits():
         details = get_movie_details(movie_id)
         if not details:
             print(f"Impossible de récupérer les détails pour {movie_id}")
+            continue
+
+        # Filtrer les films avec une date de sortie future ou aujourd'hui
+        release_date_str = get_movie_details.get("release_date")
+        try:
+            release_date = datetime.strptime(release_date_str, "%Y-%m-%d").date()
+            if release_date > today:
+                continue
+        except:
             continue
         
         genres_mapping = get_genre_mapping(api_key=api_key)
@@ -189,7 +199,7 @@ def fetch_upcoming_movies_with_credits():
         release_date_str = upcoming_details.get("release_date")
         try:
             release_date = datetime.strptime(release_date_str, "%Y-%m-%d").date()
-            if release_date < today:
+            if release_date <= today:
                 continue
         except:
             continue
