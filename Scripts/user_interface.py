@@ -10,6 +10,11 @@ from datetime import datetime
 from scraping import fetch_movies_with_credits, fetch_upcoming_movies_with_credits
 from scipy.sparse import hstack
 import pickle
+from collections import Counter
+import seaborn as sns
+import matplotlib.pyplot as plt
+import re
+import plotly_express as px
 
 
 #***********************************************************************************
@@ -173,9 +178,7 @@ def get_image(selected_movie, df_source):
         poster_path = df_source[df_source['originalTitle'] == selected_movie]['poster_path'].iloc[0]
         if pd.isna(poster_path) or poster_path == '':
             raise ValueError("Aucune image disponible")
-
-        return racine + poster_path
-        
+        return racine + poster_path  
     except (IndexError, ValueError) as e:
         print(f"Image non trouvée pour le film '{selected_movie}' : {e}")
         return "https://via.placeholder.com/300x450?text=No+Image"
@@ -327,7 +330,7 @@ def align_features(df_input, features_reference):
             df_input[col] = 0
     return df_input[features_reference]
 
-# fonction de recommandation
+# ---- fonction de recommandation ----
 def recommander_films(film_titre, df, knn, scaler, tfidf_vectorizer, n_recommendations=10):
 
     # vérifier si le film est bien dans la base
@@ -364,7 +367,7 @@ def recommander_films(film_titre, df, knn, scaler, tfidf_vectorizer, n_recommend
     except Exception as e:
         return f"Erreur lors de la recommandation : {e}"
 
-# fonction de recommandation permettant d'entrainer les modèles sur les nouvelles bases
+# ---- fonction de recommandation permettant d'entrainer les modèles sur les nouvelles bases ----
 def recommander_depuis_autre_df(film_titre, df_source, df_target, knn, scaler, tfidf_vectorizer, features, n_recommendations=10):
     try:
         match = df_source[df_source['originalTitle'] == film_titre]
@@ -409,7 +412,7 @@ def recommander_depuis_autre_df(film_titre, df_source, df_target, knn, scaler, t
     except Exception as e:
         return f"Erreur lors de la recommandation : {e}"
 
-# fonction pour la recommandation par acteur
+# ---- fonction pour la recommandation par acteur ----
 def recommander_par_acteur(acteur, df, n=10):
     films = []
     for _, row in df.iterrows():
@@ -427,34 +430,8 @@ def recommander_par_acteur(acteur, df, n=10):
     # On récupère les lignes (sans le rang)
     return pd.DataFrame([film[0] for film in sorted_films[:n]])
 
-# affichage des détails de recommandation avec modal
-def afficher_recommandations(titres, df_image, df_details, prefix):
-    modals = []
 
-    cols = st.columns(len(titres))
-    for i, col in enumerate(cols):
-        with col:
-            title = titres.iloc[i]
-            st.image(get_image(title, df_image), use_container_width=True)
-
-            bouton_key = f"{prefix}_btn_{i}"
-            modal_key = f"{prefix}_modal_{i}"
-            fermer_key = f"{prefix}_close_{i}"
-
-            if st.button(title, key=bouton_key):
-                st.session_state[modal_key] = True
-
-            if st.session_state.get(modal_key, False):
-                modals.append((title, df_details, modal_key, fermer_key))
-
-    for title, df, modal_key, fermer_key in modals:
-        modal = Modal(title, key=modal_key, max_width=1000)
-        with modal.container():
-            movie_details(df, title)
-            if st.button("Fermer", key=fermer_key):
-                st.session_state[modal_key] = False
-
-# fonction d'affichage des recommandations
+# ---- fonction d'affichage des recommandations ----
 def recommendation_show():
     selected_movie = st.session_state.get("selected_movie", None)
 
@@ -469,60 +446,44 @@ def recommendation_show():
     if isinstance(movie_reco, str):
         st.error(movie_reco)
         return
-    afficher_recommandations(movie_reco["originalTitle"], df_movies, df_movies, "genre")
+    
+    cols = st.columns(len(movie_reco))
+    for i, col in enumerate(cols):
+        with col:
+            title = movie_reco["originalTitle"].iloc[i]
+            st.image(get_image(title, df_movies), use_container_width=True)
 
-    # cols = st.columns(len(movie_reco))
-    # for i, col in enumerate(cols):
-    #     with col:
-    #         title = movie_reco["originalTitle"].iloc[i]
-    #         st.image(get_image(title, df_movies), use_container_width=True)
+            if st.button(f"{title}", key=f"genre_modal_btn_{i}"):
+                st.session_state[f"open_modal_{i}"] = True
+            #st.caption(title)
 
-    #         st.markdown(f"""
-    #             <style>
-    #                 div[data-testid="stButton"][key="genre_modal_btn_{i}"] button {{
-    #                     background-color: white;
-    #                     color: black;
-    #                     border-radius: 8px;
-    #                     padding: 0.5em 1em;
-    #                     font-weight: bold;
-    #                     box-shadow: 20 8px 16px 0 rgba(0,0,0,0.2);
-    #                 }}
-    #                 div[data-testid="stButton"][key="genre_modal_btn_{i}"] button:hover {{
-    #                     background-color: #e7e7e7;
-    #                 }}
-    #             </style>
-    #         """, unsafe_allow_html=True)
-    #         if st.button(f"{title}", key=f"genre_modal_btn_{i}"):
-    #             st.session_state[f"open_modal_{i}"] = True
-    #         #st.caption(title)
-
-    #     if st.session_state.get(f"open_modal_{i}", False):
-    #         modal = Modal(title, key=f"modal_genre_{i}", max_width=1000)
-    #         with modal.container():
-    #             movie_details(df_movies, title)
-    #             if st.button("Fermer", key=f"close_genre_modal_{i}"):
-    #                 st.session_state[f"open_modal_{i}"] = False
+        if st.session_state.get(f"open_modal_{i}", False):
+            modal = Modal(title, key=f"modal_genre_{i}", max_width=1000)
+            with modal.container():
+                movie_details(df_movies, title)
+                if st.button("Fermer", key=f"close_genre_modal_{i}"):
+                    st.session_state[f"open_modal_{i}"] = False
 
     # films avec l'acteur principal
     act_princip = st.session_state.get("main_actor", None)
     if act_princip:
         st.subheader(f"Films avec {act_princip}")
         movie_main_actor = recommander_par_acteur(act_princip, df_movies)
-        afficher_recommandations(movie_main_actor["originalTitle"], movie_main_actor, movie_main_actor, "acteur")
+        
+        cols_actor = st.columns(len(movie_main_actor))
+        for i, col in enumerate(cols_actor):
+            with col:
+                actor_title = movie_main_actor["originalTitle"].iloc[i]
+                st.image(get_image(actor_title, df_movies), use_container_width=True)
+                #st.caption(actor_title)
 
-        # cols_actor = st.columns(len(movie_main_actor))
-        # for i, col in enumerate(cols_actor):
-        #     with col:
-        #         actor_title = movie_main_actor["originalTitle"].iloc[i]
-        #         st.image(get_image(actor_title, df_movies), use_container_width=True)
-        #         #st.caption(actor_title)
+                if st.button(f"{actor_title}", key=f"actor_modal_btn_{i}"):
+                    st.session_state[f"open_modal_actor{i}"] = True
 
-        # if st.session_state.get(f"open_modal_{i}", False):
-        #     modal = Modal(title, key=f"modal_genre_{i}", max_width=1000)
-        #     with modal.container():
-        #         movie_details(movie_main_actor, actor_title)
-        #         if st.button("Fermer", key=f"close_genre_modal_{i}"):
-        #             st.session_state[f"open_modal_{i}"] = False
+        if st.session_state.get(f"open_modal_actor{i}", False):
+            modal_actor = Modal(actor_title, key=f"modal_actor_{i}", max_width=1000)
+            with modal_actor.container():
+                movie_details(df_movies, actor_title)
     else:
         st.info("Acteur principal non disponible.")
 
@@ -531,14 +492,22 @@ def recommendation_show():
     movie_now_playing = recommander_depuis_autre_df(film_titre=selected_movie, df_source=df_movies, df_target=df_now_playing, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, features=features, n_recommendations=10)
 
     if isinstance(movie_now_playing, pd.DataFrame) and not movie_now_playing.empty:
-        # num_movies = movie_now_playing.shape[0]
-        afficher_recommandations(movie_now_playing["originalTitle"], df_now_playing, df_now_playing, "now")
+        num_movies = movie_now_playing.shape[0]
      
-        # cols_now = st.columns(num_movies)
-        # for i, col in enumerate(cols_now):
-        #     with col:
-        #         st.image(get_image(movie_now_playing["originalTitle"].iloc[i], df_now_playing), use_container_width=True)
-        #         st.caption(movie_now_playing["originalTitle"].iloc[i])
+        cols_now = st.columns(num_movies)
+        for i, col in enumerate(cols_now):
+            with col:
+                now_title = movie_now_playing["originalTitle"].iloc[i]
+                st.image(get_image(now_title, df_now_playing), use_container_width=True)
+                # st.caption(movie_now_playing["originalTitle"].iloc[i])
+
+                if st.button(f"{now_title}", key=f"now_modal_btn_{i}"):
+                    st.session_state[f"open_modal_now{i}"] = True
+
+        if st.session_state.get(f"open_modal_now{i}", False):
+            modal_now = Modal(now_title, key=f"modal_now_{i}", max_width=1000)
+            with modal_now.container():
+                movie_details(df_now_playing, now_title)
     else:
         st.info("Aucun film à recommander pour les séances en cours.")
 
@@ -547,14 +516,242 @@ def recommendation_show():
     movie_upcoming = recommander_depuis_autre_df(film_titre=selected_movie, df_source=df_movies, df_target=df_upcoming, knn=knn, scaler=scaler, tfidf_vectorizer=tfidf_vectorizer, features=features, n_recommendations=10)
     
     if isinstance(movie_upcoming, pd.DataFrame) and not movie_upcoming.empty:
-        afficher_recommandations(movie_upcoming["originalTitle"], df_upcoming, df_upcoming, "upcoming")
-        # st.error(movie_upcoming)
-    else:
-        cols_now = st.columns(len(movie_upcoming))
-        for i, col in enumerate(cols_now):
+        num_umovies = movie_upcoming.shape[0]
+
+        cols_up = st.columns(num_umovies)
+        for i, col in enumerate(cols_up):
             with col:
-                st.image(get_image(movie_upcoming["originalTitle"].iloc[i], df_upcoming), use_container_width=True)
-                st.caption(movie_upcoming["originalTitle"].iloc[i])
+                upcoming_title = movie_upcoming["originalTitle"].iloc[i]
+                st.image(get_image(upcoming_title, df_upcoming), use_container_width=True)
+                # st.caption(movie_upcoming["originalTitle"].iloc[i])
+
+                if st.button(f"{upcoming_title}", key=f"upc_modal_btn_{i}"):
+                    st.session_state[f"open_modal_upc{i}"] = True
+
+        if st.session_state.get(f"open_modal_upc{i}", False):
+            modal_upc = Modal(upcoming_title, key=f"modal_upc_{i}", max_width=1000)
+            with modal_upc.container():
+                movie_details(df_upcoming, upcoming_title)
+    else:
+        st.info("Aucun film à recommander pour les séances à venir.")       
+
+#***********************************************************************************
+# ANALYSE DES FILMS
+#***********************************************************************************
+
+# ---- fonction pour afficher les filtres ----
+def show_kpis(df):
+    
+    df['startYear_clean'] = pd.to_numeric(df['startYear'], errors='coerce')
+
+    # extraire les pays de production uniques: transformation en liste réelle - créer une nouvelle colonne - extraire les valeurs uniques dans un set 
+    country_dict = {'BA': 'Bosnie-Herzégovine', 'LR': 'Libéria', 'IQ': 'Irak', 'AM': 'Arménie',
+    'FI': 'Finlande', 'ID': 'Indonésie', 'RW': 'Rwanda', 'GT': 'Guatemala', 'PL': 'Pologne', 'AZ': 'Azerbaïdjan',
+    'UY': 'Uruguay', 'AU': 'Australie', 'YU': 'Yougoslavie', 'CM': 'Cameroun', 'BS': 'Bahamas', 'IT': 'Italie',
+    'CH': 'Suisse', 'SV': 'Salvador', 'AO': 'Angola', 'UA': 'Ukraine', 'CV': 'Cap-Vert', 'MU': 'Maurice',
+    'KE': 'Kenya', 'EC': 'Équateur', 'KH': 'Cambodge', 'XG': 'Guernesey', 'LV': 'Lettonie', 'TW': 'Taïwan',
+    'YE': 'Yémen', 'SK': 'Slovaquie', 'BN': 'Brunei', 'MK': 'Macédoine du Nord', 'LY': 'Libye', 'RU': 'Russie',
+    'AN': 'Antilles néerlandaises','EE': 'Estonie', 'IN': 'Inde', 'PE': 'Pérou', 'AL': 'Albanie', 'GR': 'Grèce',
+    'BE': 'Belgique', 'ZM': 'Zambie', 'SU': 'Union soviétique', 'SN': 'Sénégal', 'MW': 'Malawi', 'SL': 'Sierra Leone',
+    'GD': 'Grenade', 'XK': 'Kosovo','BZ': 'Belize','CY': 'Chypre','CO': 'Colombie','MY': 'Malaisie','HT': 'Haïti',
+    'BR': 'Brésil','GP': 'Guadeloupe','CR': 'Costa Rica','SG': 'Singapour','SB': 'Îles Salomon','VN': 'Vietnam',
+    'JO': 'Jordanie','RO': 'Roumanie','CD': 'République démocratique du Congo','TR': 'Turquie','MC': 'Monaco',
+    'MQ': 'Martinique','GI': 'Gibraltar','FO': 'Îles Féroé','US': 'États-Unis','NI': 'Nicaragua','DJ': 'Djibouti',
+    'ML': 'Mali','NZ': 'Nouvelle-Zélande','VU': 'Vanuatu','FR': 'France','PM': 'Saint-Pierre-et-Miquelon',
+    'BF': 'Burkina Faso','GL': 'Groenland','NL': 'Pays-Bas','CF': 'République centrafricaine','GW': 'Guinée-Bissau',
+    'KW': 'Koweït','HU': 'Hongrie','PH': 'Philippines','SA': 'Arabie saoudite','GE': 'Géorgie','UZ': 'Ouzbékistan',
+    'JP': 'Japon','CZ': 'République tchèque','EG': 'Égypte','BH': 'Bahreïn','GM': 'Gambie','KR': 'Corée du Sud',
+    'GA': 'Gabon','GB': 'Royaume-Uni','DE': 'Allemagne','DO': 'République dominicaine','BY': 'Biélorussie',
+    'KG': 'Kirghizistan','CL': 'Chili','NO': 'Norvège','IS': 'Islande','PS': 'Palestine','TZ': 'Tanzanie','MT': 'Malte',
+    'WS': 'Samoa','MZ': 'Mozambique','LT': 'Lituanie','AQ': 'Antarctique','BM': 'Bermudes','LA': 'Laos',
+    'PT': 'Portugal','IR': 'Iran','PR': 'Porto Rico','CS': 'Serbie-Monténégro','MX': 'Mexique','BD': 'Bangladesh',
+    'PG': 'Papouasie-Nouvelle-Guinée','NA': 'Namibie','MG': 'Madagascar','GH': 'Ghana','KM': 'Comores','MD': 'Moldavie',
+    'SE': 'Suède','ZA': 'Afrique du Sud','VG': 'Îles Vierges britanniques','HK': 'Hong Kong','IL': 'Israël',
+    'SI': 'Slovénie','AT': 'Autriche','TL': 'Timor oriental','CA': 'Canada','NP': 'Népal','LI': 'Liechtenstein',
+    'BI': 'Burundi','ZW': 'Zimbabwe','XC': 'Île Christmas','SR': 'Suriname','KY': 'Îles Caïmans','CU': 'Cuba',
+    'TD': 'Tchad','BB': 'Barbade','TH': 'Thaïlande','RS': 'Serbie','SO': 'Somalie','SZ': 'Eswatini','VE': 'Venezuela',
+    'ET': 'Éthiopie','MN': 'Mongolie','BJ': 'Bénin','ER': 'Érythrée','PK': 'Pakistan','FJ': 'Fidji','MA': 'Maroc',
+    'TJ': 'Tadjikistan','QA': 'Qatar','CG': 'République du Congo','AW': 'Aruba','NG': 'Nigeria','BG': 'Bulgarie',
+    'BT': 'Bhoutan','LU': 'Luxembourg','FK': 'Îles Falkland','GQ': 'Guinée équatoriale','TT': 'Trinité-et-Tobago',
+    'MO': 'Macao','CX': 'Île Christmas','BO': 'Bolivie','LB': 'Liban','SY': 'Syrie','PF': 'Polynésie française',
+    'DK': 'Danemark','SD': 'Soudan','LK': 'Sri Lanka','AI': 'Anguilla','ES': 'Espagne','PY': 'Paraguay',
+    'KP': 'Corée du Nord','AF': 'Afghanistan','GN': 'Guinée','HN': 'Honduras','MV': 'Maldives','AE': 'Émirats arabes unis',
+    'CI': "Côte d'Ivoire",'XI': 'Île Christmas','AD': 'Andorre','TC': 'Îles Turques-et-Caïques','JM': 'Jamaïque',
+    'DZ': 'Algérie','IE': 'Irlande','MM': 'Myanmar','NC': 'Nouvelle-Calédonie','MR': 'Mauritanie','HR': 'Croatie',
+    'UG': 'Ouganda','KZ': 'Kazakhstan','SJ': 'Svalbard et Jan Mayen','CN': 'Chine','NE': 'Niger','GY': 'Guyana',
+    'LS': 'Lesotho','BW': 'Botswana','AR': 'Argentine','TN': 'Tunisie','VA': 'Vatican','PA': 'Panama','ME': 'Monténégro'}
+    
+    def map_country_list(country_list_str):
+        try:
+            country_codes = ast.literal_eval(country_list_str)
+            return [country_dict.get(code, code) for code in country_codes]
+        except (ValueError, TypeError):
+            return []
+
+    df["prod_country_list"] = df["production_countries"].apply(map_country_list)
+
+    bins = [1, 3, 5, 7, 9, 10.1] # les bornes
+    labels = ["1 à 2", "3 à 4", "5 à 6", "7 à 8", "9 à 10"] # groupes
+    df["note_group"] = pd.cut(df["averageRating"], bins=bins, labels=labels, include_lowest=True) # right=False <=> bornes gauches incluses
+    
+     # ------------ Filtres ------------
+    with st.container():
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
+        with col1:
+            decade_labels = sorted(df['periode'].dropna().unique().tolist())
+            decade_options = ["Toutes"] + decade_labels
+            selected_decade = st.multiselect("Filtrer par décennie", decade_options, default="Toutes")
+
+        with col2:
+            availble_years = sorted(df['startYear_clean'].dropna().unique().astype(int).tolist())
+            year_options = ["Toutes"] + availble_years
+            selected_years = st.selectbox("Année de sortie", year_options)
+
+        with col3:
+            all_genres_set = set()
+            for sublist in df['genres_liste']:
+                if isinstance(sublist, list):
+                    all_genres_set.update(sublist)
+            all_genres = sorted(all_genres_set)
+            genre_options = ["Tous"] + all_genres
+            selected_genres = st.multiselect("Genres", genre_options, default="Tous")
+
+        with col4:
+            available_notes = sorted(df['note_group'].dropna().unique().tolist())
+            notes_options = ["Toutes"] + available_notes 
+            selected_note_group = st.multiselect("Notes (1 à 10):", notes_options, default="Toutes")
+
+        with col5:
+            all_countries = set()
+            for countries in df['prod_country_list']:
+                all_countries.update(countries)
+            country_options = sorted(list(all_countries))
+            countries = ["Tous"] + country_options
+            selected_country = st.multiselect("Choisir les pays de production :", countries, default="Tous")
+    
+    filtered_df = df.copy()         
+                    
+    # ------------ Application des filtres ------------
+    if "Toutes" not in selected_decade and selected_decade:
+        filtered_df = filtered_df[filtered_df['periode'].isin(selected_decade)]
+        
+    if selected_years != "Toutes":
+        filtered_df = filtered_df[filtered_df['startYear_clean'] == int(selected_years)]
+
+    if "Tous" not in selected_genres and selected_genres:
+        filtered_df = filtered_df[filtered_df['genres_liste'].isin(selected_genres)]
+
+    if "Toutes" not in selected_note_group and selected_note_group:
+        filtered_df = filtered_df[filtered_df['note_group'].isin(selected_note_group)]
+
+    if "Tous" not in selected_country and selected_country:
+        filtered_df = filtered_df[filtered_df['prod_country_list'].apply(lambda x: any(c in x for c in selected_country))]
+        
+
+    # ------------ Afficher les kpis ------------
+    col = st.columns((1, 4, 2.5), gap='medium')
+    with col[0]:
+        st.markdown('#### Indicateurs Clés')
+
+        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total films<br><b>{len(filtered_df)}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        all_genres = [genre for sublist in filtered_df['genres_liste'] for genre in sublist if isinstance(sublist, list)]
+        unique_language = filtered_df['original_language'].unique()
+        language_counts = len(unique_language)
+        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Langues<br><b>{language_counts}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        time_average = round(filtered_df['runtimeMinutes'].mean(), 2)
+        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Durée moyenne<br><b>{time_average} (min)</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        note_average = round(filtered_df['averageRating'].mean(), 2)
+        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Note moyenne<br><b>{note_average}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        popularity_average = round(filtered_df['popularity'].mean(), 2)
+        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Popularité moyenne<br><b>{popularity_average}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        all_actors = [actor for sublist in filtered_df['actors_name'] for actor in sublist if isinstance(sublist, list)]
+        actor_counts = Counter(all_actors)
+        unique_actors = len(actor_counts) 
+        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total acteurs<br><b>{unique_actors}</b></div>""", unsafe_allow_html=True)
+
+        
+
+    # ------------ Afficher les graphes ------------
+    with col[1]:
+        # Evolution du nombre de films par an
+        st.markdown('#### Evolution du nombre de films produit par an')
+        movie_1927 = filtered_df[filtered_df['startYear_clean'] >= 1927]
+        movie_by_yr = movie_1927['startYear_clean'].value_counts().sort_index()
+        fig, ax = plt.subplots(figsize=(18, 8))
+        sns.barplot(x=movie_by_yr.index, y=movie_by_yr.values, color='skyblue', ax=ax)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+        ax.set_xlabel('')
+        st.pyplot(fig)
+
+        # Genres les plus présents
+        st.markdown('#### Genres les plus présents (Top 10)')
+        top_genres = (
+            filtered_df['genres_liste']
+            .explode()
+            .value_counts()
+            .head(10)
+        )
+        fig1, ax = plt.subplots(figsize=(12, 5))
+        sns.barplot(x=top_genres.index, y=top_genres.values, order=top_genres.index, palette='pastel', ax=ax)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+        ax.set_xlabel('')
+        st.pyplot(fig1)
+
+        # Evolution des durées moyennes des films par an
+        st.markdown('#### Evolution des durées moyennes par an')
+        movie_by_yr_time = movie_1927.groupby('startYear_clean')['runtimeMinutes'].mean().sort_index()
+        fig2, ax = plt.subplots(figsize=(18, 7))
+        sns.barplot(x=movie_by_yr_time.index, y=movie_by_yr_time.values, color='skyblue', ax=ax)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+        ax.set_xlabel('')
+        st.pyplot(fig2)
+    
+    with col[2]:
+        # Les acteurs les plus présents
+        st.markdown('#### Acteurs les plus présents (Top 10)')
+        top_acteurs = (
+            filtered_df['actors_name']
+            .explode()
+            .value_counts()
+            .head(10)
+        )
+        fig3, ax = plt.subplots(figsize=(10, 9))
+        sns.barplot(y=top_acteurs.index, x=top_acteurs.values, order=top_acteurs.index, palette='crest', ax=ax)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        st.pyplot(fig3)
+
+        # Les films les plus populaires
+        st.markdown('#### Films les plus populaires (Top 10)')
+        movie_by_popularity = movie_1927.groupby('originalTitle')['popularity'].max().nlargest(10)
+        fig4, ax = plt.subplots(figsize=(10, 10))
+        sns.barplot(y=movie_by_popularity.index, x=movie_by_popularity.values, order=movie_by_popularity.index, palette='crest', ax=ax)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        st.pyplot(fig4)
+
+        # Le top 5 des pays de production les plus représentés
+        st.markdown('#### Top 5 des producteurs de films')
+        top_prodcountries = (movie_1927['prod_country_list'].explode().value_counts().nlargest(5))
+        top_prodcountries = top_prodcountries.sort_values(ascending=False)
+        fig5, ax = plt.subplots(figsize=(10, 6))
+        sns.barplot(x=top_prodcountries.values, y=top_prodcountries.index, order=top_prodcountries.index, palette='pastel', ax=ax)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+        st.pyplot(fig5)
 
 
 #***********************************************************************************
@@ -588,7 +785,7 @@ st.markdown("""
     transition: background 0.3s;
 }
 .nav-link:hover {
-    background-color:rgb(201, 183, 211);
+    background-color:rgb(183, 201, 211);
 }
 .logo-h1 { 
     margin-right: 0px
@@ -606,20 +803,8 @@ st.markdown("""
 #***********************************************************************************
 # Barre de navigation (dans un seul conteneur)
 logo_path = "static/cine.png"
-# st.markdown("""
-# <div class="nav-bar">
-#     <div class="logo-h1">
-#         <img src="static/Capture.PNG" alt="Votre Logo" style="height: 100px; margin-right: 30px;">
-#     </div>
-#     <div class="nav-buttons">  <a href="?page=accueil" class="nav-link">Accueil</a>
-#         <a href="?page=recommandation" class="nav-link">Application</a>
-#             <a href="?page=analyse" class="nav-link">Indicateurs clés films</a>
-#     </div>
-# </div>
-# """, unsafe_allow_html=True)
 
 col3, col4 = st.columns([1, 3])
-
 with col3:
     try:
         logo = Image.open(logo_path)
@@ -662,72 +847,92 @@ current_page = params.get("page", "accueil")
 
 if current_page == "accueil":
     st.title("Bienvenue sur CineWhat Recommandation")
-    col5, col6 = st.columns([1, 2])
-    with col5:
-        st.image(logo_path, use_container_width=True)
-    
-    with col6:
-        st.subheader("Vous hésitez sur quel film regarder ce soir ?")
-        st.markdown("""
-        <div style='font-size:18px;'>
-        <br> <b>CineWhat Recommandation</b>  est une plateforme conçue pour vous aider à découvrir des films
-        qui correspondent à vos goûts grâce à une recommandation personnalisée basée sur les données.<br>
-        </div>
-        """, unsafe_allow_html=True)
+   
+    st.markdown("""
+    <div style='font-size:18px;'>
+    <br> <b> Vous hésitez sur quel film regarder ce soir ?</b>
+    <br> <b>CineWhat Recommandation</b>  est une plateforme conçue pour vous aider à découvrir des films
+    qui correspondent à vos goûts grâce à une recommandation personnalisée basée sur les données.<br>
+    </div>
+    """, unsafe_allow_html=True)
 
-        st.subheader("Pourquoi cette plateforme ?")
-        st.markdown("""
-        <div style='font-size:18px;'>
-        <br>Ce projet a été conçu dans le cadre de mon parcours en Data Analysis afin de mettre en pratique mes compétences en collecte,
-        traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.<br>
-        </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div style='font-size:18px;'>
+    <br> <b> Pourquoi cette plateforme ?</b>
+    <br>Ce projet a été conçu dans le cadre de mon parcours en Data Analysis afin de mettre en pratique mes compétences en collecte,
+    traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.<br>
+    </div>
+    """, unsafe_allow_html=True)
 
-        st.subheader("Que trouverez-vous ici ?")
-        st.markdown("""
-        <div style='font-size:18px;'>
-        <br>* <b>Application de recommandation</b> : Entrez vos préférences et laissez l'algorithme vous suggérer des films adaptés
-        traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.<br>
-        * <b>Indicateurs d'analyse </b> : Visualisez des statistiques sur les films collectés, explorez les tendances du cinéma et comprenez les mécanismes derrière les recommandations.
-                    </div>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <div style='font-size:18px;'>
+    <br> <b> Que trouverez-vous ici ?</b>
+    <br>* <b>Application de recommandation</b> : Entrez vos préférences et laissez l'algorithme vous suggérer des films adaptés
+    traitement et analyse de données, tout en explorant l’univers du Machine Learning appliqué aux recommandations.<br>
+    * <b>Indicateurs d'analyse </b> : Visualisez des statistiques sur les films collectés, explorez les tendances du cinéma et comprenez les mécanismes derrière les recommandations.
+                </div>
+    """, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     col7, col8 = st.columns(2)
     with col7:
         st.markdown("""
-                <div style="
+            <style>
+            .custom-button {
                 font-weight: bold;
                 border: 2px;
-                box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
                 padding: 10px 20px;
                 text-align: center;
                 cursor: pointer;
-                background-color: #f0f8ff;
-            ">
-            Je veux une recommandation de films
-        </div>
+                background-color: white;
+                color: rgb(67.8, 84.7, 90.2)
+                box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.3);
+                transition: background 0.3s
+            }
+
+            .custom-button:hover {
+                box-shadow: rgba(183, 201, 211);
+                background-color: #e6f0ff;
+            }
+            </style>
+
+            <a href='?page=recommandation' style="text-decoration: none;">
+                <div class="custom-button">
+                    Je veux une recommandation de films
+                </div>
+            </a>
         """, unsafe_allow_html=True)
         
     with col8:
         st.markdown("""
-                <div style="
+            <style>
+            .custom-button {
                 font-weight: bold;
                 border: 2px;
-                box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
                 padding: 10px 20px;
                 text-align: center;
                 cursor: pointer;
-                background-color: #f0f8ff;
-            ">
-            Je veux voir les tendances du cinéma
-        </div>
-        """, unsafe_allow_html=True)
+                background-color: white;
+                color: rgb(67.8, 84.7, 90.2)
+                box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.3);
+                transition: background 0.3s
+            }
+
+            .custom-button:hover {
+                box-shadow: rgba(183, 201, 211);
+                background-color: #e6f0ff;
+            }
+            </style>
+
+            <a href='?page=analyse' style="text-decoration: none;">
+                <div class="custom-button">
+                    Je veux voir les tendances du cinéma
+                </div>
+            </a>
+        """, unsafe_allow_html=True)   
 
 elif current_page == "recommandation":
     st.title("Bienvenue sur l'application de recommandation de films")
-    # st.markdown("""
-    # <img src="static/Capture.JPG" style="float: left" alt="Image" style="width:100%;"/> </div>""", unsafe_allow_html=True)
     
     df_movies = load_static_data()
     user_choice(df_movies)
@@ -742,6 +947,14 @@ elif current_page == "recommandation":
     recommendation_show()
 
 elif current_page == "analyse":
-    st.title("Bienvenue, ici explorez les tendances du cinéma.")
+    st.title("Bienvenue, ici explorez des tendances du cinéma.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style="background-color:#f0f8ff; padding:10px; border-radius:10px; border:1px solid #cce;">
+            ℹ️ <b>Info :</b> Le tableau de bord ci-dessous concerne uniquement certains films sortis entre <b>1900 et 2024</b>.
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    show_kpis(df=df_movies)
 else:
     st.write("Page non trouvée")
