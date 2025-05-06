@@ -1,0 +1,11 @@
+streamlit
+pandas
+joblib
+scikit-learn
+streamlit-modal
+Pillow
+scipy
+seaborn
+matplotlib
+plotly
+scraping.py
