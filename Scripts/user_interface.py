@@ -653,31 +653,36 @@ def show_kpis(df):
     with col[0]:
         st.markdown('#### Indicateurs Clés')
 
-        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total films<br><b>{len(filtered_df)}</b></div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total films<br><b>{len(filtered_df)}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>" \
+        "<br>", unsafe_allow_html=True)
         
         all_genres = [genre for sublist in filtered_df['genres_liste'] for genre in sublist if isinstance(sublist, list)]
         unique_language = filtered_df['original_language'].unique()
         language_counts = len(unique_language)
-        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Langues<br><b>{language_counts}</b></div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Langues<br><b>{language_counts}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>" \
+        "<br>", unsafe_allow_html=True)
         
         time_average = round(filtered_df['runtimeMinutes'].mean(), 2)
-        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Durée moyenne<br><b>{time_average} (min)</b></div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Durée moyenne<br><b>{time_average} (min)</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>" \
+        "<br>", unsafe_allow_html=True)
         
         note_average = round(filtered_df['averageRating'].mean(), 2)
-        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Note moyenne<br><b>{note_average}</b></div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Note moyenne<br><b>{note_average}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>" \
+        "<br>", unsafe_allow_html=True)
 
         popularity_average = round(filtered_df['popularity'].mean(), 2)
-        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Popularité moyenne<br><b>{popularity_average}</b></div>""", unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Popularité moyenne<br><b>{popularity_average}</b></div>""", unsafe_allow_html=True)
+        st.markdown("<br>" \
+        "<br>", unsafe_allow_html=True)
 
         all_actors = [actor for sublist in filtered_df['actors_name'] for actor in sublist if isinstance(sublist, list)]
         actor_counts = Counter(all_actors)
         unique_actors = len(actor_counts) 
-        st.markdown(f"""<div style='background-color: #F8F0FC; border: 4px solid #ADD8E6; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total acteurs<br><b>{unique_actors}</b></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total acteurs<br><b>{unique_actors}</b></div>""", unsafe_allow_html=True)
 
         
 
@@ -687,7 +692,7 @@ def show_kpis(df):
         st.markdown('#### Evolution du nombre de films produit par an')
         movie_1927 = filtered_df[filtered_df['startYear_clean'] >= 1927]
         movie_by_yr = movie_1927['startYear_clean'].value_counts().sort_index()
-        fig, ax = plt.subplots(figsize=(18, 8))
+        fig, ax = plt.subplots(figsize=(18, 6))
         sns.barplot(x=movie_by_yr.index, y=movie_by_yr.values, color='skyblue', ax=ax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
         ax.set_xlabel('')
@@ -701,7 +706,7 @@ def show_kpis(df):
             .value_counts()
             .head(10)
         )
-        fig1, ax = plt.subplots(figsize=(12, 5))
+        fig1, ax = plt.subplots(figsize=(12, 4))
         sns.barplot(x=top_genres.index, y=top_genres.values, order=top_genres.index, palette='pastel', ax=ax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
         ax.set_xlabel('')
@@ -710,7 +715,7 @@ def show_kpis(df):
         # Evolution des durées moyennes des films par an
         st.markdown('#### Evolution des durées moyennes par an')
         movie_by_yr_time = movie_1927.groupby('startYear_clean')['runtimeMinutes'].mean().sort_index()
-        fig2, ax = plt.subplots(figsize=(18, 7))
+        fig2, ax = plt.subplots(figsize=(18, 5))
         sns.barplot(x=movie_by_yr_time.index, y=movie_by_yr_time.values, color='skyblue', ax=ax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
         ax.set_xlabel('')
@@ -725,7 +730,7 @@ def show_kpis(df):
             .value_counts()
             .head(10)
         )
-        fig3, ax = plt.subplots(figsize=(10, 9))
+        fig3, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(y=top_acteurs.index, x=top_acteurs.values, order=top_acteurs.index, palette='crest', ax=ax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
         ax.set_xlabel('')
@@ -735,7 +740,7 @@ def show_kpis(df):
         # Les films les plus populaires
         st.markdown('#### Films les plus populaires (Top 10)')
         movie_by_popularity = movie_1927.groupby('originalTitle')['popularity'].max().nlargest(10)
-        fig4, ax = plt.subplots(figsize=(10, 10))
+        fig4, ax = plt.subplots(figsize=(10, 6))
         sns.barplot(y=movie_by_popularity.index, x=movie_by_popularity.values, order=movie_by_popularity.index, palette='crest', ax=ax)
         ax.set_xticklabels(ax.get_xticklabels(), rotation=45)
         ax.set_xlabel('')
