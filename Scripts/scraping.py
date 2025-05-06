@@ -4,6 +4,7 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 import joblib
+from datetime import datetime
 
 load_dotenv()
 api_key = os.getenv("TMDB_API_KEY")
@@ -67,6 +68,7 @@ def get_movie_details(movie_id):
 def fetch_movies_with_credits():
     movies = get_now_playing_movies()
     movie_data = []
+    today = datetime.today().date()
 
     for movie in movies:
         movie_id = movie["id"]
@@ -74,6 +76,19 @@ def fetch_movies_with_credits():
         details = get_movie_details(movie_id)
         if not details:
             print(f"Impossible de récupérer les détails pour {movie_id}")
+            continue
+
+        # Filtrer les films avec une date de sortie future ou aujourd'hui
+        release_date_str = details.get("release_date")
+        if not release_date_str:
+            print(f"Date de sortie manquante pour {movie_id}")
+            continue
+        try:
+            release_date = datetime.strptime(release_date_str, "%Y-%m-%d").date()
+            if release_date > today:
+                continue
+        except Exception as e:
+            print(f"Erreur sur la date pour {movie_id} : {e}")
             continue
         
         genres_mapping = get_genre_mapping(api_key=api_key)
@@ -121,27 +136,25 @@ def fetch_movies_with_credits():
         movie_data.append({
             "id": movie_id,
             "originalTitle": details["original_title"],
-            "release_date": details["release_date"],
+            "startYear": details["release_date"],
             "runtimeMinutes": details.get("runtime"),
             "budget": details.get("budget"),
-            "vote_average": details["vote_average"],
-            "vote_count": details["vote_count"],
+            "averageRating": details["vote_average"],
+            "numVotes": details["vote_count"],
             "popularity": details["popularity"],
             "overview": details["overview"],
             "poster_path": details["poster_path"],
             "genres": ", ".join(genres),
-            "actors": ", ".join(actors),
+            "actors_name": ", ".join(actors),
             "actors_rank": ", ".join(map(str, actors_rank)),
-            "directors": ", ".join(directors),
-            "writers": ", ".join(writers),
-            "producers": ", ".join(producers),
-            "cinematographers": ", ".join(cinematographers),
-            "editors": ", ".join(editors),
+            "directors_name": ", ".join(directors),
+            "writers_name": ", ".join(writers),
+            "producers_name": ", ".join(producers),
+            "cinematographers_name": ", ".join(cinematographers),
+            "editors_name": ", ".join(editors)
         })
 
     return pd.DataFrame(movie_data)
-
-
 
 # Récupérer les films bientôt au cinéma de TMDB
 def get_upcoming_movies(pages=100): 
@@ -176,6 +189,7 @@ def get_upcoming_movie_details(movie_id):
 def fetch_upcoming_movies_with_credits():
     upcoming_movies = get_upcoming_movies()
     upcoming_movie_data = []
+    today = datetime.today().date()
 
     for movie in upcoming_movies:
         movie_id = movie["id"]
@@ -183,6 +197,19 @@ def fetch_upcoming_movies_with_credits():
         upcoming_details = get_upcoming_movie_details(movie_id)
         if not upcoming_details:
             print(f"Impossible de récupérer les détails pour {movie_id}")
+            continue
+
+         # Filtrer les films avec une date de sortie future ou aujourd'hui
+        release_date_str = upcoming_details.get("release_date")
+        if not release_date_str:
+            print(f"Date de sortie manquante pour {movie_id}")
+            continue
+        try:
+            release_date = datetime.strptime(release_date_str, "%Y-%m-%d").date()
+            if release_date <= today:
+                continue
+        except Exception as e:
+            print(f"Erreur sur la date pour {movie_id} : {e}")
             continue
         
         genres_mapping = get_genre_mapping(api_key=api_key)
@@ -230,22 +257,36 @@ def fetch_upcoming_movies_with_credits():
         upcoming_movie_data.append({
             "id": movie_id,
             "originalTitle": upcoming_details["original_title"],
-            "release_date": upcoming_details["release_date"],
+            "startYear": upcoming_details["release_date"],
             "runtimeMinutes": upcoming_details.get("runtime"),
             "budget": upcoming_details.get("budget"),
-            "vote_average": upcoming_details["vote_average"],
-            "vote_count": upcoming_details["vote_count"],
+            "averageRating": upcoming_details["vote_average"],
+            "numVotes": upcoming_details["vote_count"],
             "popularity": upcoming_details["popularity"],
             "overview": upcoming_details["overview"],
             "poster_path": upcoming_details["poster_path"],
             "genres": ", ".join(genres),
-            "actors": ", ".join(actors),
+            "actors_name": ", ".join(actors),
             "actors_rank": ", ".join(map(str, actors_rank)),
-            "directors": ", ".join(directors),
-            "writers": ", ".join(writers),
-            "producers": ", ".join(producers),
-            "cinematographers": ", ".join(cinematographers),
-            "editors": ", ".join(editors),
+            "directors_name": ", ".join(directors),
+            "writers_name": ", ".join(writers),
+            "producers_name": ", ".join(producers),
+            "cinematographers_name": ", ".join(cinematographers),
+            "editors_name": ", ".join(editors)
         })
-
+        
     return pd.DataFrame(upcoming_movie_data)
+
+if __name__ == "__main__":
+    # Création du dossier s'il n'existe pas
+    os.makedirs("BD_A_IGNORE", exist_ok=True)
+
+    # Extraction des films en salle
+    df_now_playing = fetch_movies_with_credits()
+    df_now_playing.to_pickle("BD_A_IGNORE/df_now_playing.pkl")
+    print("✅ df_now_playing.pkl sauvegardé avec succès.")
+
+    # Extraction des films à venir
+    df_upcoming = fetch_upcoming_movies_with_credits()
+    df_upcoming.to_pickle("BD_A_IGNORE/df_upcoming.pkl")
+    print("✅ df_upcoming.pkl sauvegardé avec succès.")
