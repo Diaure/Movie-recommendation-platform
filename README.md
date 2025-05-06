@@ -29,7 +29,7 @@ C’est ici que tout se passe ! L’utilisateur peut :
 
 Une fonctionnalité de **`mise à jour forcée`** permet de rafraîchir manuellement les données des films actuellement diffusés ou à venir, pour s'assurer que les recommandations soient toujours pertinentes.
 
-### Tendances
+### 📊 Tendances
 
 Un tableau de bord permettant d'explorer :
 
