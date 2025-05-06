@@ -8,3 +8,4 @@ scipy
 seaborn
 matplotlib
 plotly
+python-dotenv
