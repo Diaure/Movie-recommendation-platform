@@ -7,7 +7,7 @@ import ast
 from streamlit_modal import Modal
 from PIL import Image
 from datetime import datetime
-from .scraping import fetch_movies_with_credits, fetch_upcoming_movies_with_credits
+from scraping import fetch_movies_with_credits, fetch_upcoming_movies_with_credits
 from scipy.sparse import hstack
 import pickle
 from collections import Counter
