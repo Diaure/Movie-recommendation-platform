@@ -66,7 +66,7 @@ def traiter_donnees_film(df):
     return dfs
 
 
-df_movies = joblib.load("../BD_A_IGNORE/df_movies.pkl")
+df_movies = joblib.load("./BD_A_IGNORE/df_movies.pkl")
 
 movie_data = fetch_movies_with_credits()
 df_now_playing = movie_data[~movie_data["originalTitle"].isin(df_movies["originalTitle"])]
@@ -76,7 +76,7 @@ upcoming_movie_data = fetch_upcoming_movies_with_credits()
 df_upcoming_movie_data = upcoming_movie_data[~upcoming_movie_data["originalTitle"].isin(df_movies["originalTitle"])]
 df_upcoming_movie_data = traiter_donnees_film(df_upcoming_movie_data)
 
-joblib.dump(df_now_playing, "../BD_A_IGNORE/df_now_playing.pkl") # enregistrer la base sans utiliser de csv
-joblib.dump(df_upcoming_movie_data, "../BD_A_IGNORE/df_upcoming_movie.pkl") # enregistrer la base sans utiliser de csv
+joblib.dump(df_now_playing, "./BD_A_IGNORE/df_now_playing.pkl") # enregistrer la base sans utiliser de csv
+joblib.dump(df_upcoming_movie_data, "./BD_A_IGNORE/df_upcoming_movie.pkl") # enregistrer la base sans utiliser de csv
 
 print("Bases enregistrées avec succès !")
