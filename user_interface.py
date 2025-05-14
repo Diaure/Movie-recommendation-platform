@@ -68,7 +68,7 @@ tfidf_vectorizer = joblib.load("./BD_A_IGNORE/tfidf_vectorizer.pkl")
 @st.cache_data
 def load_static_data():    
     try:
-        df_movies = joblib.load("../BD_A_IGNORE/df_movies.pkl")
+        df_movies = joblib.load("./BD_A_IGNORE/df_movies.pkl")
         return df_movies
 
     except Exception as e:
