@@ -53,12 +53,12 @@ if "page" not in st.session_state:
 
 #chargement des features et des modèles
 
-with open("../BD_A_IGNORE/features_list.pkl", "rb") as f:
+with open("./BD_A_IGNORE/features_list.pkl", "rb") as f:
     features = pickle.load(f)
 
-knn = joblib.load("../BD_A_IGNORE/modele_knn.pkl")
-scaler = joblib.load("../BD_A_IGNORE/scaler.pkl")
-tfidf_vectorizer = joblib.load("../BD_A_IGNORE/tfidf_vectorizer.pkl")
+knn = joblib.load("./BD_A_IGNORE/modele_knn.pkl")
+scaler = joblib.load("./BD_A_IGNORE/scaler.pkl")
+tfidf_vectorizer = joblib.load("./BD_A_IGNORE/tfidf_vectorizer.pkl")
 
 #***********************************************************************************
 # FONCTION DE CHARGEMENT DES DONNEES STATIQUES
@@ -807,7 +807,7 @@ st.markdown("""
 
 #***********************************************************************************
 # Barre de navigation (dans un seul conteneur)
-logo_path = "static/cine.png"
+logo_path = "cine.png"
 
 col3, col4 = st.columns([1, 3])
 with col3:
