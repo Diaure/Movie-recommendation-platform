@@ -15,6 +15,9 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import re
 import plotly_express as px
+from PIL import Image
+import requests
+from io import BytesIO
 
 
 #***********************************************************************************
@@ -64,11 +67,16 @@ tfidf_vectorizer = joblib.load("./BD_A_IGNORE/tfidf_vectorizer.pkl")
 # FONCTION DE CHARGEMENT DES DONNEES STATIQUES
 #***********************************************************************************
 
+# Définir chemin absolu vers BD_A_IGNORE
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BD_PATH = os.path.join(CURRENT_DIR, "BD_A_IGNORE")
+
 # chargement données fixes
 @st.cache_data
 def load_static_data():    
     try:
-        df_movies = joblib.load("./BD_A_IGNORE/df_movies.pkl")
+        # df_movies = joblib.load("./BD_A_IGNORE/df_movies.pkl")
+        df_movies = joblib.load(os.path.join(BD_PATH, "df_movies.pkl"))
         return df_movies
 
     except Exception as e:
@@ -81,9 +89,16 @@ df_movies = load_static_data()
 #***********************************************************************************
 # MISE A JOUR
 #*********************************************************************************** 
+# def check_update():
+#     if os.path.exists("last_update.txt"):
+#         with open("last_update.txt", "r") as f:
+#             return f.read()
+#     return ""
+
 def check_update():
-    if os.path.exists("last_update.txt"):
-        with open("last_update.txt", "r") as f:
+    path = os.path.join(CURRENT_DIR, "last_update.txt")
+    if os.path.exists(path):
+        with open(path, "r") as f:
             return f.read()
     return ""
 
@@ -96,21 +111,28 @@ def update_movie_data():
             df_now_playing = fetch_movies_with_credits()
             df_upcoming = fetch_upcoming_movies_with_credits()
 
-            os.makedirs("../BD_A_IGNORE", exist_ok=True)
-            joblib.dump(df_now_playing, "../BD_A_IGNORE/df_now_playing.pkl")
-            joblib.dump(df_upcoming, "../BD_A_IGNORE/df_upcoming_movie.pkl")
+            # os.makedirs("../BD_A_IGNORE", exist_ok=True)
+            # joblib.dump(df_now_playing, "../BD_A_IGNORE/df_now_playing.pkl")
+            # joblib.dump(df_upcoming, "../BD_A_IGNORE/df_upcoming_movie.pkl")
+
+            os.makedirs(BD_PATH, exist_ok=True)
+            joblib.dump(df_now_playing, os.path.join(BD_PATH, "df_now_playing.pkl"))
+            joblib.dump(df_upcoming, os.path.join(BD_PATH, "df_upcoming_movie.pkl"))
 
             # Mettre à jour le fichier "last_update.txt"
-            with open("last_update.txt", "w") as f:
+            # with open("last_update.txt", "w") as f:
+            with open(os.path.join(CURRENT_DIR, "last_update.txt"), "w") as f:
                 f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
             return True
+        
     except Exception as e:
         st.error(f"❌ Échec de la mise à jour via scraping : {e}")
         return False
 
 def run_treatment_script():
     try:  
-        result = subprocess.run(["python", "traitement.py"], capture_output=True, text=True)
+        # result = subprocess.run(["python", "traitement.py"], capture_output=True, text=True)
+        result = subprocess.run(["python", os.path.join(CURRENT_DIR, "traitement.py")], capture_output=True, text=True)
         if result.returncode != 0:
             st.error(f"Erreur traitement.py : {result.stderr}")
             return False
@@ -122,8 +144,10 @@ def run_treatment_script():
 # Auto-scraping + traitement si fichiers manquants
 def ensure_data_ready():
     required_files = [
-        "../BD_A_IGNORE/df_now_playing.pkl",
-        "../BD_A_IGNORE/df_upcoming_movie.pkl"
+        # "../BD_A_IGNORE/df_now_playing.pkl",
+        # "../BD_A_IGNORE/df_upcoming_movie.pkl"
+        os.path.join(BD_PATH, "df_now_playing.pkl"),
+        os.path.join(BD_PATH, "df_upcoming_movie.pkl")
     ]
     if not all(os.path.exists(f) for f in required_files):
         st.warning("🔎 Fichiers manquants : lancement automatique du scraping et traitement.")
@@ -140,8 +164,10 @@ ensure_data_ready()
 @st.cache_data(ttl=3600, hash_funcs={str: lambda _: last_update})
 def load_updated_data():
     try:
-        df_now_playing = joblib.load("../BD_A_IGNORE/df_now_playing.pkl")
-        df_upcoming = joblib.load("../BD_A_IGNORE/df_upcoming_movie.pkl")
+        # df_now_playing = joblib.load("../BD_A_IGNORE/df_now_playing.pkl")
+        # df_upcoming = joblib.load("../BD_A_IGNORE/df_upcoming_movie.pkl")
+        df_now_playing = joblib.load(os.path.join(BD_PATH, "df_now_playing.pkl"))
+        df_upcoming = joblib.load(os.path.join(BD_PATH, "df_upcoming_movie.pkl"))
         df_now_playing.fillna("", inplace=True)
         df_upcoming.fillna("", inplace=True)
         return df_now_playing, df_upcoming
@@ -181,7 +207,13 @@ def get_image(selected_movie, df_source):
         return racine + poster_path  
     except (IndexError, ValueError) as e:
         print(f"Image non trouvée pour le film '{selected_movie}' : {e}")
-        return "https://via.placeholder.com/300x450?text=No+Image"
+        url_lambda = "https://previews.123rf.com/images/drogatnev/drogatnev1708/drogatnev170800054/83745795-mod%C3%A8le-d-affiche-de-film-pop-corn-soda-%C3%A0-emporter-lunettes-de-cin%C3%A9ma-3d-bobine-de-film-et.jpg"
+        response = requests.get(url_lambda)
+        img = Image.open(BytesIO(response.content))
+        img = img.resize((300, 450))
+        # path_temp = "/Movie-recommendation-platform/default_image.jpg"
+        # img.save(path_temp)
+        return img
 
 #***********************************************************************************
 # FONCTION D'AFFICHAGE DES DETAILS DU FILM SELECTIONNE PAR L'UTILISATEUR
@@ -212,6 +244,11 @@ def user_choice(df_movies):
                     st.session_state["selected_movie"] = selected_movie
 
 # fonction détails des films
+st.write(df_movies["genres_liste"])
+# st.write(df_now_playing["genres"])
+# st.write(df_upcoming["genres"])
+st.write(df_now_playing.columns)
+st.write(df_upcoming.columns)
 def movie_details(df, selected_movie):
                         
     # définir la table pour récupérer les informations du film
@@ -471,19 +508,21 @@ def recommendation_show():
         movie_main_actor = recommander_par_acteur(act_princip, df_movies)
         
         cols_actor = st.columns(len(movie_main_actor))
-        for i, col in enumerate(cols_actor):
+        for a, col in enumerate(cols_actor):
             with col:
-                actor_title = movie_main_actor["originalTitle"].iloc[i]
+                actor_title = movie_main_actor["originalTitle"].iloc[a]
                 st.image(get_image(actor_title, df_movies), use_container_width=True)
                 #st.caption(actor_title)
 
-                if st.button(f"{actor_title}", key=f"actor_modal_btn_{i}"):
-                    st.session_state[f"open_modal_actor{i}"] = True
+                if st.button(f"{actor_title}", key=f"actor_modal_btn_{a}"):
+                    st.session_state[f"open_modal_actor_{a}"] = True
 
-        if st.session_state.get(f"open_modal_actor{i}", False):
-            modal_actor = Modal(actor_title, key=f"modal_actor_{i}", max_width=1000)
-            with modal_actor.container():
-                movie_details(df_movies, actor_title)
+            if st.session_state.get(f"open_modal_actor_{a}", False):
+                modal_actor = Modal(actor_title, key=f"modal_actor_{a}", max_width=1000)
+                with modal_actor.container():
+                    movie_details(df_movies, actor_title)
+                    if st.button("Fermer", key=f"close_modal_actor_{a}"):
+                        st.session_state[f"open_modal_actor_{a}"] = False
     else:
         st.info("Acteur principal non disponible.")
 
@@ -495,19 +534,21 @@ def recommendation_show():
         num_movies = movie_now_playing.shape[0]
      
         cols_now = st.columns(num_movies)
-        for i, col in enumerate(cols_now):
+        for n, col in enumerate(cols_now):
             with col:
-                now_title = movie_now_playing["originalTitle"].iloc[i]
+                now_title = movie_now_playing["originalTitle"].iloc[n]
                 st.image(get_image(now_title, df_now_playing), use_container_width=True)
-                # st.caption(movie_now_playing["originalTitle"].iloc[i])
 
-                if st.button(f"{now_title}", key=f"now_modal_btn_{i}"):
-                    st.session_state[f"open_modal_now{i}"] = True
+                if st.button(f"{now_title}", key=f"now_modal_btn_{n}"):
+                    st.session_state[f"open_modal_now{n}"] = True
 
-        if st.session_state.get(f"open_modal_now{i}", False):
-            modal_now = Modal(now_title, key=f"modal_now_{i}", max_width=1000)
-            with modal_now.container():
-                movie_details(df_now_playing, now_title)
+            if st.session_state.get(f"open_modal_now{n}", False):
+                modal_now = Modal(now_title, key=f"modal_now_{n}", max_width=1000)
+                with modal_now.container():
+                    movie_details(df_now_playing, now_title)
+                    if st.button("Fermer", key=f"close_modal_now_{n}"):
+                        st.session_state[f"open_modal_now_{n}"] = False
+
     else:
         st.info("Aucun film à recommander pour les séances en cours.")
 
@@ -519,19 +560,22 @@ def recommendation_show():
         num_umovies = movie_upcoming.shape[0]
 
         cols_up = st.columns(num_umovies)
-        for i, col in enumerate(cols_up):
+        for u, col in enumerate(cols_up):
             with col:
-                upcoming_title = movie_upcoming["originalTitle"].iloc[i]
+                upcoming_title = movie_upcoming["originalTitle"].iloc[u]
                 st.image(get_image(upcoming_title, df_upcoming), use_container_width=True)
                 # st.caption(movie_upcoming["originalTitle"].iloc[i])
 
-                if st.button(f"{upcoming_title}", key=f"upc_modal_btn_{i}"):
-                    st.session_state[f"open_modal_upc{i}"] = True
+                if st.button(f"{upcoming_title}", key=f"upc_modal_btn_{u}"):
+                    st.session_state[f"open_modal_upc{u}"] = True
 
-        if st.session_state.get(f"open_modal_upc{i}", False):
-            modal_upc = Modal(upcoming_title, key=f"modal_upc_{i}", max_width=1000)
-            with modal_upc.container():
-                movie_details(df_upcoming, upcoming_title)
+            if st.session_state.get(f"open_modal_upc{u}", False):
+                modal_upc = Modal(upcoming_title, key=f"modal_upc_{u}", max_width=1000)
+                with modal_upc.container():
+                    movie_details(df_upcoming, upcoming_title)
+                    if st.button("Fermer", key=f"close_modal_upc_{u}"):
+                        st.session_state[f"open_modal_upc_{u}"] = False
+
     else:
         st.info("Aucun film à recommander pour les séances à venir.")       
 
@@ -653,36 +697,36 @@ def show_kpis(df):
     with col[0]:
         st.markdown('#### Indicateurs Clés')
 
-        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total films<br><b>{len(filtered_df)}</b></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #ffffff; border: 4px solid #000000; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total films<br><b>{len(filtered_df)}</b></div>""", unsafe_allow_html=True)
         st.markdown("<br>" \
         "<br>", unsafe_allow_html=True)
         
         all_genres = [genre for sublist in filtered_df['genres_liste'] for genre in sublist if isinstance(sublist, list)]
         unique_language = filtered_df['original_language'].unique()
         language_counts = len(unique_language)
-        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Langues<br><b>{language_counts}</b></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #ffffff; border: 4px solid #000000; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Langues<br><b>{language_counts}</b></div>""", unsafe_allow_html=True)
         st.markdown("<br>" \
         "<br>", unsafe_allow_html=True)
         
         time_average = round(filtered_df['runtimeMinutes'].mean(), 2)
-        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Durée moyenne<br><b>{time_average} (min)</b></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #ffffff; border: 4px solid #000000; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Durée moyenne<br><b>{time_average} (min)</b></div>""", unsafe_allow_html=True)
         st.markdown("<br>" \
         "<br>", unsafe_allow_html=True)
         
         note_average = round(filtered_df['averageRating'].mean(), 2)
-        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Note moyenne<br><b>{note_average}</b></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #ffffff; border: 4px solid #000000; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Note moyenne<br><b>{note_average}</b></div>""", unsafe_allow_html=True)
         st.markdown("<br>" \
         "<br>", unsafe_allow_html=True)
 
         popularity_average = round(filtered_df['popularity'].mean(), 2)
-        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Popularité moyenne<br><b>{popularity_average}</b></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #ffffff; border: 4px solid #000000; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Popularité moyenne<br><b>{popularity_average}</b></div>""", unsafe_allow_html=True)
         st.markdown("<br>" \
         "<br>", unsafe_allow_html=True)
 
         all_actors = [actor for sublist in filtered_df['actors_name'] for actor in sublist if isinstance(sublist, list)]
         actor_counts = Counter(all_actors)
         unique_actors = len(actor_counts) 
-        st.markdown(f"""<div style='background-color: #000000; border: 4px solid #ffffff; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total acteurs<br><b>{unique_actors}</b></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style='background-color: #ffffff; border: 4px solid #000000; border-radius: 10px; padding: 5px; font-size: 26px; text-align: center;'> Total acteurs<br><b>{unique_actors}</b></div>""", unsafe_allow_html=True)
 
         
 

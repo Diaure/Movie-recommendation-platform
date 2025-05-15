@@ -9,3 +9,6 @@ seaborn
 matplotlib
 plotly
 python-dotenv
+Image
+requests
+BytesIO
