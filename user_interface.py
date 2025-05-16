@@ -20,6 +20,7 @@ import requests
 from io import BytesIO
 
 
+
 #***********************************************************************************
 # configuration de la page
 st.set_page_config(page_title="Recommandation de Films", page_icon="🎬", layout="wide")
@@ -181,15 +182,42 @@ df_now_playing, df_upcoming = load_updated_data()
 # ZONE ADMIN AFIN DE FORCER LA MISE A JOUR
 #***********************************************************************************
 # Ajout d'un mode admin pour autoriser la mise à jour manuelle uniquement si l'admin est activé
-is_admin = st.secrets["admin"]["mode"].lower() == "true"
+admin_password = st.secrets["admin"]["password"]
 
-if is_admin:
+# --- Initialisation du flag admin en session ---
+if "is_admin" not in st.session_state:
+    st.session_state["is_admin"] = False
+
+# is_admin = st.secrets["admin"]["mode"].lower() == "true"
+
+# if is_admin:
+#     with st.expander("🔐 Zone Admin : Forcer la mise à jour des films"):
+#         st.success("Mode admin activé")
+#         if st.button("🔄 Forcer la mise à jour maintenant"):
+#             if update_movie_data() and run_treatment_script():
+#                 st.success("✅ Mise à jour réussie.")
+#                 st.rerun()
+#             else:
+#                 st.error("❌ Échec de la mise à jour.")
+
+# --- Zone de saisie du mot de passe admin ---
+with st.sidebar:
+    pwd = st.text_input("🔐 Admin password (leave blank)", type="password")
+    if pwd:
+        if pwd == admin_password:
+            st.session_state["is_admin"] = True
+            st.success("🔓 Admin mode activated")
+        else:
+            st.error("❌ Wrong password")
+
+# --- Zone Admin visible uniquement si st.session_state["is_admin"] est True ---
+if st.session_state["is_admin"]:
     with st.expander("🔐 Zone Admin : Forcer la mise à jour des films"):
-        st.success("Mode admin activé")
         if st.button("🔄 Forcer la mise à jour maintenant"):
-            if update_movie_data() and run_treatment_script():
+            success = update_movie_data() and run_treatment_script()
+            if success:
                 st.success("✅ Mise à jour réussie.")
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("❌ Échec de la mise à jour.")
 
@@ -198,22 +226,47 @@ if is_admin:
 #***********************************************************************************
 
 # fonction pour récupérer le poster des films
-def get_image(selected_movie, df_source):
+
+# sources = {
+#     "movies": df_movies,
+#     "now_playing": df_now_playing,
+#     "upcoming": df_upcoming
+# }
+
+def get_image(selected_movie, df):
+# def get_image(selected_movie: str, sources: dict):
     racine = 'https://image.tmdb.org/t/p/w600_and_h900_bestv2'
+
+#     # Parcourt chaque source
+#     for name, df in sources.items():
+#         print("=============================")
+#         print("This is name ", name)
+#         print(df.columns)
+#         print("=============================")
+
+#         subset = df[df['originalTitle'] == selected_movie]
+#         if not subset.empty:
+#             poster_path = subset['poster_path'].iloc[0]
+#             if pd.notna(poster_path) and poster_path != '':
+#                 return racine + poster_path
+#             # Si path vide ou NaN, on break pour passer à l'image par défaut
+#             break
+#     # Si aucune source ne contient le film, ou que poster_path est invalide
+#     print(f"Image non trouvée pour '{selected_movie}', utilisation d'une image par défaut.")
+#     url_lambda = "https://previews.123rf.com/images/drogatnev/drogatnev1708/drogatnev170800054/83745795-mod%C3%A8le-d-affiche-de-film-pop-corn-soda-%C3%A0-emporter-lunettes-de-cin%C3%A9ma-3d-bobine-de-film-et.jpg"
+    
     try:
-        poster_path = df_source[df_source['originalTitle'] == selected_movie]['poster_path'].iloc[0]
+        poster_path = df[df['originalTitle'] == selected_movie]['poster_path'].iloc[0]
         if pd.isna(poster_path) or poster_path == '':
             raise ValueError("Aucune image disponible")
         return racine + poster_path  
     except (IndexError, ValueError) as e:
         print(f"Image non trouvée pour le film '{selected_movie}' : {e}")
         url_lambda = "https://previews.123rf.com/images/drogatnev/drogatnev1708/drogatnev170800054/83745795-mod%C3%A8le-d-affiche-de-film-pop-corn-soda-%C3%A0-emporter-lunettes-de-cin%C3%A9ma-3d-bobine-de-film-et.jpg"
-        response = requests.get(url_lambda)
-        img = Image.open(BytesIO(response.content))
-        img = img.resize((300, 450))
-        # path_temp = "/Movie-recommendation-platform/default_image.jpg"
-        # img.save(path_temp)
-        return img
+    response = requests.get(url_lambda)
+    img = Image.open(BytesIO(response.content))
+    img = img.resize((300, 450))
+    return img
 
 #***********************************************************************************
 # FONCTION D'AFFICHAGE DES DETAILS DU FILM SELECTIONNE PAR L'UTILISATEUR
@@ -244,11 +297,6 @@ def user_choice(df_movies):
                     st.session_state["selected_movie"] = selected_movie
 
 # fonction détails des films
-st.write(df_movies["genres_liste"])
-# st.write(df_now_playing["genres"])
-# st.write(df_upcoming["genres"])
-st.write(df_now_playing.columns)
-st.write(df_upcoming.columns)
 def movie_details(df, selected_movie):
                         
     # définir la table pour récupérer les informations du film
@@ -285,7 +333,8 @@ def movie_details(df, selected_movie):
         else:
             st.session_state["main_actor"] = None
 
-        actors_str = ', '.join(actors_sorted)
+        actors_display = actors_sorted[:6]
+        actors_str = ', '.join(actors_display)
 
         # extraire et sélectionner le réalisateur
         movie_info['directors_name'] = movie_info['directors_name'].apply(lambda x: ast.literal_eval(x) if isinstance(x, str) else x)
@@ -330,7 +379,7 @@ def movie_details(df, selected_movie):
         # extraire et sélectionner la durée
         time = int(movie_info['runtimeMinutes'].iloc[0])
 
-        poster_url = get_image(selected_movie, df_movies)
+        poster_url = get_image(selected_movie, df)
         st.markdown(f""" 
         <div style="display: flex; align-items: space-between;">
                 <!-- Image du film -->
@@ -540,9 +589,9 @@ def recommendation_show():
                 st.image(get_image(now_title, df_now_playing), use_container_width=True)
 
                 if st.button(f"{now_title}", key=f"now_modal_btn_{n}"):
-                    st.session_state[f"open_modal_now{n}"] = True
+                    st.session_state[f"open_modal_now_{n}"] = True
 
-            if st.session_state.get(f"open_modal_now{n}", False):
+            if st.session_state.get(f"open_modal_now_{n}", False):
                 modal_now = Modal(now_title, key=f"modal_now_{n}", max_width=1000)
                 with modal_now.container():
                     movie_details(df_now_playing, now_title)
@@ -567,9 +616,9 @@ def recommendation_show():
                 # st.caption(movie_upcoming["originalTitle"].iloc[i])
 
                 if st.button(f"{upcoming_title}", key=f"upc_modal_btn_{u}"):
-                    st.session_state[f"open_modal_upc{u}"] = True
+                    st.session_state[f"open_modal_upc_{u}"] = True
 
-            if st.session_state.get(f"open_modal_upc{u}", False):
+            if st.session_state.get(f"open_modal_upc_{u}", False):
                 modal_upc = Modal(upcoming_title, key=f"modal_upc_{u}", max_width=1000)
                 with modal_upc.container():
                     movie_details(df_upcoming, upcoming_title)

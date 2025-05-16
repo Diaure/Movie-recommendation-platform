@@ -57,8 +57,15 @@ def traiter_donnees_film(df):
     
     dfs = df.copy()
 
-    # transformer la colonne "genres" en liste
+    # transformer les colonne en "vraies" listes
     dfs["genres_liste"] = dfs["genres"].apply(split_chaine_en_liste)
+    dfs["actors_name"] = dfs["actors_name"].apply(split_chaine_en_liste)
+    dfs["actors_rank"] = dfs["actors_rank"].apply(split_chaine_en_liste)
+    dfs["directors_name"] = dfs["directors_name"].apply(split_chaine_en_liste)
+    dfs["writers_name"] = dfs["writers_name"].apply(split_chaine_en_liste)
+    dfs["producers_name"] = dfs["producers_name"].apply(split_chaine_en_liste)
+    dfs["cinematographers_name"] = dfs["cinematographers_name"].apply(split_chaine_en_liste)
+    dfs["editors_name"] = dfs["editors_name"].apply(split_chaine_en_liste)
 
     # extraire les genres uniques
     tous_les_genres = set()

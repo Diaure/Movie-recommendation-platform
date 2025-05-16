@@ -12,3 +12,4 @@ python-dotenv
 Image
 requests
 BytesIO
+os
