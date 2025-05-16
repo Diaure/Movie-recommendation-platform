@@ -2,12 +2,20 @@ import pandas as pd
 import warnings
 warnings.filterwarnings("ignore") 
 import joblib
+import os
 from scraping import fetch_movies_with_credits, fetch_upcoming_movies_with_credits
+
+warnings.filterwarnings("ignore")
+
+# Construire un chemin absolu vers le dossier BD_A_IGNORE
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BD_PATH = os.path.join(CURRENT_DIR, "BD_A_IGNORE")
+os.makedirs(BD_PATH, exist_ok=True)
 
 # créer une liste à partir des chaines de caractère
 def split_chaine_en_liste(x):
     if isinstance(x, str):
-        return x.split(',') 
+        return [genre.strip() for genre in x.split(',')]
     else:
         return x
     
@@ -49,8 +57,15 @@ def traiter_donnees_film(df):
     
     dfs = df.copy()
 
-    # transformer la colonne "genres" en liste
+    # transformer les colonne en "vraies" listes
     dfs["genres_liste"] = dfs["genres"].apply(split_chaine_en_liste)
+    dfs["actors_name"] = dfs["actors_name"].apply(split_chaine_en_liste)
+    dfs["actors_rank"] = dfs["actors_rank"].apply(split_chaine_en_liste)
+    dfs["directors_name"] = dfs["directors_name"].apply(split_chaine_en_liste)
+    dfs["writers_name"] = dfs["writers_name"].apply(split_chaine_en_liste)
+    dfs["producers_name"] = dfs["producers_name"].apply(split_chaine_en_liste)
+    dfs["cinematographers_name"] = dfs["cinematographers_name"].apply(split_chaine_en_liste)
+    dfs["editors_name"] = dfs["editors_name"].apply(split_chaine_en_liste)
 
     # extraire les genres uniques
     tous_les_genres = set()
@@ -61,12 +76,13 @@ def traiter_donnees_film(df):
     for genre in tous_les_genres:
         dfs[f'genre_{genre}'] = dfs["genres_liste"].apply(lambda x: int(genre in x))
 
-    dfs["periode"] = dfs["release_date"].apply(decennie)
+    dfs["periode"] = dfs["startYear"].apply(decennie)
 
     return dfs
 
 
-df_movies = joblib.load("./BD_A_IGNORE/df_movies.pkl")
+# df_movies = joblib.load("../BD_A_IGNORE/df_movies.pkl")
+df_movies = joblib.load(os.path.join(BD_PATH, "df_movies.pkl"))
 
 movie_data = fetch_movies_with_credits()
 df_now_playing = movie_data[~movie_data["originalTitle"].isin(df_movies["originalTitle"])]
@@ -76,7 +92,12 @@ upcoming_movie_data = fetch_upcoming_movies_with_credits()
 df_upcoming_movie_data = upcoming_movie_data[~upcoming_movie_data["originalTitle"].isin(df_movies["originalTitle"])]
 df_upcoming_movie_data = traiter_donnees_film(df_upcoming_movie_data)
 
-joblib.dump(df_now_playing, "./BD_A_IGNORE/df_now_playing.pkl") # enregistrer la base sans utiliser de csv
-joblib.dump(df_upcoming_movie_data, "./BD_A_IGNORE/df_upcoming_movie.pkl") # enregistrer la base sans utiliser de csv
+# joblib.dump(df_now_playing, "../BD_A_IGNORE/df_now_playing.pkl") # enregistrer la base sans utiliser de csv
+# joblib.dump(df_upcoming_movie_data, "../BD_A_IGNORE/df_upcoming_movie.pkl") # enregistrer la base sans utiliser de csv
+
+joblib.dump(df_now_playing, os.path.join(BD_PATH, "df_now_playing.pkl"))
+joblib.dump(df_upcoming_movie_data, os.path.join(BD_PATH, "df_upcoming_movie.pkl"))
 
 print("Bases enregistrées avec succès !")
+print(df_now_playing.columns)
+print(df_upcoming_movie_data.columns)
